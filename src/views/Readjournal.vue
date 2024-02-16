@@ -1,41 +1,43 @@
 <script setup>
 import { ref, onMounted } from 'vue';
-import axios from 'axios';
-
-import { useRouter } from 'vue-router';
+import { createDirectus, rest, readItems, deleteItem } from '@directus/sdk';
+import { useRouter, useRoute } from 'vue-router';
 
 const router = useRouter();
+const route = useRoute()
 const journals = ref([]);
 
+const client = createDirectus('http://localhost:8055').with(rest());
 
 onMounted(async () => {
   try {
-    const response = await axios.get('https://travel-journal.directus.app/items/journals');
-    journals.value = response.data.data;
+    const response = await client.request(readItems('journals'));
+    console.log("Full response:", response);
+    journals.value = response;
+    console.log("journlas value from readjournal:", journals.value);
   } catch (error) {
     console.error('Error fetching journals:', error);
   }
 });
 
 const editJournal = (journal) => {
-  router.push({ name: 'addjournal', query: { journalId: journal.id } });
-  console.log(journal)
+  router.push({ name: 'addjournal', query: { journalId: journal.id }});
+  console.log("Editing journal:", journal.id);
 };
-
 
 const deleteJournal = async (journalId) => {
   try {
-    await axios.delete(`https://travel-journal.directus.app/items/journals/${journalId}`);
-    journals.value = journals.value.filter(journal => journal.id !== journalId);
+    await client.request(deleteItem('journals', journalId));
+    journals.value = journals.value.filter((journal) => journal.id !== journalId);
+    console.log("Journal deleted:", journalId);
   } catch (error) {
     console.error('Error deleting journal:', error);
   }
 };
 
 const getImageUrl = (imageId) => {
-  return `https://travel-journal.directus.app/assets/${imageId}`;
+  return `http://localhost:8055/assets/${imageId}`;
 };
-
 </script>
 
   

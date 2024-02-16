@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch } from 'vue';
-import axios from 'axios';
+import { createDirectus, uploadFiles, rest, createItems, updateItem, readItems } from '@directus/sdk';
 import { useRouter, useRoute } from 'vue-router';
 
 const router = useRouter();
@@ -14,24 +14,31 @@ const city = ref('');
 const photoPreview = ref(null); 
 const isLoading = ref(false);
 
-
 const getImageUrl = (imageId) => {
-  return `https://travel-journal.directus.app/assets/${imageId}`;
+  return `http://localhost:8055/assets/${imageId}`;
 };
 
+const client = createDirectus("http://localhost:8055").with(rest());
+  
 
 watch(journalId, async (newJournalId) => {
   if (newJournalId) {
     try {
       isLoading.value = true;
-      const response = await axios.get(`https://travel-journal.directus.app/items/journals/${newJournalId}`);
-      const journalData = response.data.data;
+      const journalData = await client.request(readItems('journals', {
+        filter: {
+          id: {
+            _eq: newJournalId,
+          },
+        },
+        fields: ['title', 'description', 'country', 'city', 'photo'],
+      }));
 
-      title.value = journalData.title;
-      description.value = journalData.description;
-      country.value = journalData.country;
-      city.value = journalData.city;
-      photoPreview.value = getImageUrl(journalData.photo); 
+      title.value = journalData[0].title;
+      description.value = journalData[0].description;
+      country.value = journalData[0].country;
+      city.value = journalData[0].city;
+      photoPreview.value = getImageUrl(journalData[0].photo); 
     } catch (error) {
       console.error('Error fetching journal:', error);
     } finally {
@@ -39,7 +46,6 @@ watch(journalId, async (newJournalId) => {
     }
   }
 }, { immediate: true });
-
 
 const handleFile = (file) => {
   photo.value = file;
@@ -50,31 +56,33 @@ const handleFile = (file) => {
   reader.readAsDataURL(file);
 };
 
-
 const uploadImageToDirectus = async () => {
-  const formData = new FormData();
-  formData.append('file', photo.value);
-
   try {
-    const response = await axios.post('https://travel-journal.directus.app/files', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response.data.data.id; 
+    if (!photo.value) {
+      return null;
+    }
+    
+    const formData = new FormData();
+    formData.append('file', photo.value); 
+    const response = await client.request(uploadFiles(formData));
+
+    if (response && response.id) {
+      return response.id;
+    } else {
+      console.error('Unexpected response format:', response);
+      throw new Error('Invalid response format or missing expected data');
+    }
   } catch (error) {
     console.error('Image upload failed:', error);
     throw error;
   }
 };
 
-
 const handleSubmit = async () => {
   isLoading.value = true;
   try {
     let imageUUID;
     if (photo.value) {
-      
       imageUUID = await uploadImageToDirectus();
     } else {
       const imageIdMatch = photoPreview.value.match(/\/assets\/(.+)$/);
@@ -91,13 +99,11 @@ const handleSubmit = async () => {
 
     let response;
     if (journalId.value) {
-      response = await axios.patch(`https://travel-journal.directus.app/items/journals/${journalId.value}`, journalData);
+      response = await client.request(updateItem('journals', journalId.value, journalData));
     } else {
-      response = await axios.post('https://travel-journal.directus.app/items/journals', journalData);
+      response = await client.request(createItems('journals', journalData));
     }
-
-    console.log('Journal entry processed:', response.data);
-    router.push({ name: 'readjournal' });
+    router.push({ name: 'readjournal'});
   } catch (error) {
     console.error('Journal submission failed:', error);
     if (error.response) {

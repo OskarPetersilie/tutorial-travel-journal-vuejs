@@ -1,23 +1,26 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import axios from 'axios';
+import { createDirectus, authentication, rest, login} from '@directus/sdk';
 
-const router = useRouter();
 const email = ref('');
 const password = ref('');
 
+const router = useRouter();
+
+const directus = createDirectus('http://localhost:8055').with(authentication('json')).with(rest());
+
+
 const handleLogin = async () => {
   try {
-    const response = await axios.post('https://travel-journal.directus.app/auth/login', {
-      email: email.value,
-      password: password.value
-    });
-
-    localStorage.setItem('auth_token', response.data.token);
+    const response = await directus.request(login(email.value, password.value));
+    console.log('Authentication successful', response);
     router.push({ name: 'addjournal' });
+    if (response.access_token) {
+      localStorage.setItem('userToken', response.access_token);
+    }
   } catch (error) {
-    console.error('Login failed:', error);
+    console.error('Authentication failed:', error);
   }
 };
 </script>

@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import axios from 'axios';
+import { createDirectus, createUser, rest } from '@directus/sdk';
 
 const router = useRouter();
 
@@ -10,23 +10,24 @@ const lastName = ref('');
 const email = ref('');
 const password = ref('');
 
+const directus = createDirectus('http://localhost:8055').with(rest());
+
 const handleSignup = async () => {
   try {
-    const response = await axios.post('https://travel-journal.directus.app/users', {
+    const response = await directus.request(createUser({
       first_name: firstName.value,
       last_name: lastName.value,
       email: email.value,
       password: password.value,
-      role: 'e37c887a-..',
-    });
-    console.log('Signup successful:', response.data);
+      role: '..72a55849',
+    }));
+    console.log('Signup successful:', response);
     router.push({ name: 'addjournal' });
   } catch (error) {
     console.error('Signup failed:', error);
   }
 };
 </script>
-
 
 <template>
   <div class="signup-container">
